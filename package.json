@@ -1,0 +1,317 @@
+{
+  "name": "caspian-emulator",
+  "displayName": "Caspian Emulator",
+  "description": "All-in-one Android emulator management: AVD control, embedded screen, ADB tools, logcat viewer, file explorer, and more.",
+  "version": "0.1.0",
+  "publisher": "CaspianTools",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Debuggers"
+  ],
+  "keywords": [
+    "android",
+    "emulator",
+    "adb",
+    "avd",
+    "logcat"
+  ],
+  "icon": "resources/Icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/caspian-explorer/caspian-emulator"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onView:caspian.avdList",
+    "onView:caspian.deviceList",
+    "onView:caspian.fileExplorer"
+  ],
+  "contributes": {
+    "configuration": {
+      "title": "Caspian Emulator",
+      "properties": {
+        "caspian.androidSdkPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Android SDK root directory. Leave empty for auto-detection."
+        },
+        "caspian.emulatorArgs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Additional arguments to pass when launching the emulator."
+        },
+        "caspian.logcat.maxLines": {
+          "type": "number",
+          "default": 10000,
+          "description": "Maximum number of logcat lines to keep in the viewer."
+        },
+        "caspian.scrcpyPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to scrcpy binary for screen mirroring. Leave empty for auto-detection."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "caspian.setupSdk",
+        "title": "Setup Android SDK",
+        "category": "Caspian"
+      },
+      {
+        "command": "caspian.refreshAvds",
+        "title": "Refresh AVD List",
+        "category": "Caspian",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "caspian.createAvd",
+        "title": "Create AVD",
+        "category": "Caspian",
+        "icon": "$(add)"
+      },
+      {
+        "command": "caspian.launchAvd",
+        "title": "Launch Emulator",
+        "category": "Caspian",
+        "icon": "$(play)"
+      },
+      {
+        "command": "caspian.stopAvd",
+        "title": "Stop Emulator",
+        "category": "Caspian",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "caspian.deleteAvd",
+        "title": "Delete AVD",
+        "category": "Caspian",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "caspian.editAvd",
+        "title": "Edit AVD Configuration",
+        "category": "Caspian",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "caspian.refreshDevices",
+        "title": "Refresh Device List",
+        "category": "Caspian",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "caspian.installApk",
+        "title": "Install APK",
+        "category": "Caspian",
+        "icon": "$(package)"
+      },
+      {
+        "command": "caspian.takeScreenshot",
+        "title": "Take Screenshot",
+        "category": "Caspian",
+        "icon": "$(device-camera)"
+      },
+      {
+        "command": "caspian.recordScreen",
+        "title": "Record Screen",
+        "category": "Caspian",
+        "icon": "$(record)"
+      },
+      {
+        "command": "caspian.openShell",
+        "title": "Open ADB Shell",
+        "category": "Caspian",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "caspian.showLogcat",
+        "title": "Show Logcat",
+        "category": "Caspian",
+        "icon": "$(output)"
+      },
+      {
+        "command": "caspian.showEmulatorScreen",
+        "title": "Show Emulator Screen",
+        "category": "Caspian",
+        "icon": "$(device-mobile)"
+      },
+      {
+        "command": "caspian.refreshFiles",
+        "title": "Refresh File Explorer",
+        "category": "Caspian",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "caspian.pullFile",
+        "title": "Download File from Device",
+        "category": "Caspian",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "caspian.pushFile",
+        "title": "Upload File to Device",
+        "category": "Caspian",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "caspian.deleteFile",
+        "title": "Delete File on Device",
+        "category": "Caspian",
+        "icon": "$(trash)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "caspian",
+          "title": "Caspian Emulator",
+          "icon": "resources/Icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "caspian": [
+        {
+          "id": "caspian.avdList",
+          "name": "Virtual Devices"
+        },
+        {
+          "id": "caspian.deviceList",
+          "name": "Connected Devices"
+        },
+        {
+          "id": "caspian.fileExplorer",
+          "name": "Device Files"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "caspian.avdList",
+        "contents": "No Android SDK found.\n[Setup Android SDK](command:caspian.setupSdk)"
+      },
+      {
+        "view": "caspian.deviceList",
+        "contents": "No devices connected.\nLaunch an emulator or connect a device via USB."
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "caspian.refreshAvds",
+          "when": "view == caspian.avdList",
+          "group": "navigation"
+        },
+        {
+          "command": "caspian.createAvd",
+          "when": "view == caspian.avdList",
+          "group": "navigation"
+        },
+        {
+          "command": "caspian.refreshDevices",
+          "when": "view == caspian.deviceList",
+          "group": "navigation"
+        },
+        {
+          "command": "caspian.refreshFiles",
+          "when": "view == caspian.fileExplorer",
+          "group": "navigation"
+        },
+        {
+          "command": "caspian.pushFile",
+          "when": "view == caspian.fileExplorer",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "caspian.launchAvd",
+          "when": "view == caspian.avdList && viewItem == avd.stopped",
+          "group": "inline"
+        },
+        {
+          "command": "caspian.stopAvd",
+          "when": "view == caspian.avdList && viewItem == avd.running",
+          "group": "inline"
+        },
+        {
+          "command": "caspian.editAvd",
+          "when": "view == caspian.avdList",
+          "group": "1_edit"
+        },
+        {
+          "command": "caspian.deleteAvd",
+          "when": "view == caspian.avdList && viewItem == avd.stopped",
+          "group": "2_delete"
+        },
+        {
+          "command": "caspian.installApk",
+          "when": "view == caspian.deviceList",
+          "group": "1_actions"
+        },
+        {
+          "command": "caspian.takeScreenshot",
+          "when": "view == caspian.deviceList",
+          "group": "1_actions"
+        },
+        {
+          "command": "caspian.recordScreen",
+          "when": "view == caspian.deviceList",
+          "group": "1_actions"
+        },
+        {
+          "command": "caspian.openShell",
+          "when": "view == caspian.deviceList",
+          "group": "2_tools"
+        },
+        {
+          "command": "caspian.showLogcat",
+          "when": "view == caspian.deviceList",
+          "group": "2_tools"
+        },
+        {
+          "command": "caspian.showEmulatorScreen",
+          "when": "view == caspian.deviceList && viewItem == device.emulator",
+          "group": "2_tools"
+        },
+        {
+          "command": "caspian.pullFile",
+          "when": "view == caspian.fileExplorer && viewItem == file",
+          "group": "inline"
+        },
+        {
+          "command": "caspian.deleteFile",
+          "when": "view == caspian.fileExplorer && viewItem =~ /^(file|folder)$/",
+          "group": "2_delete"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.mjs --production",
+    "watch": "node esbuild.mjs --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {
+    "@vscode/webview-ui-toolkit": "^1.4.0"
+  }
+}
