@@ -69,6 +69,17 @@ export interface DeviceProfile {
   resolution: string;
 }
 
+export interface JavaInfo {
+  found: boolean;
+  version: string;
+  path: string;
+}
+
+export interface DiskSpaceInfo {
+  available: number;
+  sufficient: boolean;
+}
+
 export interface EmulatorProcess {
   avdName: string;
   serial: string;

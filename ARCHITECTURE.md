@@ -25,6 +25,10 @@ System design and component overview for Caspian Emulator.
 │         ┌──────┴─────┐      │  ┌───┴────────┐      │
 │         │ SdkManager │      │  │DeviceTracker│     │
 │         └──────┬─────┘      │  └───┬─────────┘     │
+│                │            │      │                │
+│         ┌──────┴────────┐   │      │                │
+│         │ SdkDownloader │   │      │                │
+│         └──────┬────────┘   │      │                │
 └────────────────┼────────────┼──────┼────────────────┘
                  │            │      │
          ┌───────┴────────────┴──────┴──────┐
@@ -33,15 +37,49 @@ System design and component overview for Caspian Emulator.
          └──────────────────────────────────┘
 ```
 
+## Source Tree
+
+```
+src/
+├── extension.ts                   — Entry point, command registration, activation
+├── constants.ts                   — Command IDs, view IDs, config keys, SDK download config
+├── types.ts                       — TypeScript interfaces
+├── sdk/
+│   ├── SdkManager.ts              — SDK auto-detection, validation, setup wizard
+│   └── SdkDownloader.ts           — Zero-dependency SDK download and installation
+├── adb/
+│   ├── AdbClient.ts               — ADB command wrapper
+│   └── DeviceTracker.ts           — Real-time device connection monitoring
+├── avd/
+│   └── AvdManager.ts              — AVD CRUD, emulator launch/stop
+└── views/
+    ├── AvdTreeProvider.ts         — Sidebar: Virtual Devices
+    ├── DeviceTreeProvider.ts      — Sidebar: Connected Devices
+    ├── FileExplorerProvider.ts    — Sidebar: Device file browser
+    ├── LogcatPanel.ts             — Webview: live logcat viewer
+    └── EmulatorScreenPanel.ts     — Webview: emulator screen mirror
+```
+
 ## Module Descriptions
 
 ### Entry Point
 
-**`src/extension.ts`** — Extension activation and command registration. Orchestrates SDK detection on startup, initializes all managers and views, and wires commands to handlers. If the SDK isn't found, registers placeholder commands that prompt the setup wizard.
+**`src/extension.ts`** — Extension activation and command registration. Orchestrates SDK detection on startup, initializes all managers and views, and wires commands to handlers. If the SDK isn't found, registers placeholder commands that prompt the setup wizard or SDK download.
 
 ### Core Services
 
-**`src/sdk/SdkManager.ts`** — Detects the Android SDK by checking user settings, environment variables (`ANDROID_HOME`, `ANDROID_SDK_ROOT`), and platform-specific default paths. Validates that required tools (`adb`, `emulator`) exist. Provides a setup wizard using VS Code's folder picker dialog.
+**`src/sdk/SdkManager.ts`** — Detects the Android SDK by checking user settings, environment variables (`ANDROID_HOME`, `ANDROID_SDK_ROOT`), and platform-specific default paths. Validates that required tools (`adb`, `emulator`) exist. Provides a setup wizard with three options: use detected SDK, download automatically, or browse for an existing installation.
+
+**`src/sdk/SdkDownloader.ts`** — Handles zero-dependency SDK download and installation. Enables running Android emulators without Android Studio. Responsibilities:
+- **Java detection** — checks `JAVA_HOME`, system PATH, macOS `/usr/libexec/java_home`, and common Windows JDK paths
+- **Disk space check** — validates ~5 GB available (PowerShell on Windows, `df` on Unix)
+- **SDK download** — downloads command-line tools from Google's CDN with redirect following and progress reporting
+- **Extraction** — uses PowerShell `Expand-Archive` on Windows, `unzip` on Unix; reorganizes to `cmdline-tools/latest/`
+- **License acceptance** — pipes "y" to `sdkmanager --licenses` with a 60-second timeout
+- **Component installation** — installs platform-tools, emulator, and a system image via `sdkmanager`
+- **Default AVD creation** — creates "Caspian_Default" with Pixel 6 profile, Android 35
+- **Architecture awareness** — selects arm64-v8a on Apple Silicon, x86_64 elsewhere
+- **Recovery** — detects partial installations and resumes from the last completed step
 
 **`src/adb/AdbClient.ts`** — Wrapper around the `adb` command-line tool. Provides typed methods for:
 - Device listing and property queries
@@ -86,11 +124,28 @@ All methods use `child_process.execFile` for one-shot commands and `child_proces
 
 ### Shared
 
-**`src/types.ts`** — TypeScript interfaces for all data models: `SdkInfo`, `AvdInfo`, `DeviceInfo`, `LogcatEntry`, `DeviceFile`, `SystemImage`, `DeviceProfile`, `EmulatorProcess`.
+**`src/types.ts`** — TypeScript interfaces for all data models: `SdkInfo`, `AvdInfo`, `DeviceInfo`, `LogcatEntry`, `DeviceFile`, `SystemImage`, `DeviceProfile`, `JavaInfo`, `DiskSpaceInfo`, `EmulatorProcess`.
 
-**`src/constants.ts`** — Extension-wide constants: command IDs, view IDs, configuration keys, SDK default paths, and platform-specific tool binary names.
+**`src/constants.ts`** — Extension-wide constants: command IDs, view IDs, configuration keys, SDK default paths, platform-specific tool binary names, and SDK download configuration (CDN URLs, build numbers, minimum Java version, disk space requirements).
 
 ## Data Flow
+
+### SDK Auto-Download Flow
+
+```
+User clicks "Download & Install Android SDK"
+  → SdkManager.runDownloadWizard()
+    → SdkDownloader.detectJava()           — verify Java 17+
+    → SdkDownloader.checkDiskSpace()       — verify ~5 GB free
+    → User confirms installation
+    → SdkDownloader.downloadCommandLineTools()  — HTTP GET from Google CDN
+    → SdkDownloader.extractCommandLineTools()   — unzip + reorganize
+    → SdkDownloader.acceptLicenses()            — pipe "y" to sdkmanager
+    → SdkDownloader.installComponents()         — platform-tools, emulator, image
+    → SdkManager.validatePath()                 — verify tools exist
+    → SdkDownloader.createDefaultAvd()          — Caspian_Default, Pixel 6
+    → SdkManager.saveSdkPath()                  — persist to VS Code settings
+```
 
 ### Device Connection Lifecycle
 
