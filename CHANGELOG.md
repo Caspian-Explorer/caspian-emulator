@@ -2,6 +2,12 @@
 
 All notable changes to Caspian Emulator will be documented in this file.
 
+## [0.2.1] - 2026-03-04
+
+### Fixed
+- Fix "spawn EINVAL" error when running SDK setup on Windows — `.bat` files (`sdkmanager.bat`, `avdmanager.bat`) now spawn with `shell: true`
+- Fix AVD creation and system image listing failing on Windows for the same reason
+
 ## [0.2.0] - 2026-03-04
 
 ### Changed
