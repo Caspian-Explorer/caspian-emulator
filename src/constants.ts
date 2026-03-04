@@ -2,6 +2,7 @@ export const EXTENSION_ID = 'caspian-emulator';
 
 export const COMMANDS = {
   SETUP_SDK: 'caspian.setupSdk',
+  DOWNLOAD_SDK: 'caspian.downloadSdk',
   REFRESH_AVDS: 'caspian.refreshAvds',
   CREATE_AVD: 'caspian.createAvd',
   LAUNCH_AVD: 'caspian.launchAvd',
@@ -52,6 +53,24 @@ export const SDK_DEFAULT_PATHS: Record<string, string[]> = {
     '/opt/android-sdk',
   ],
 };
+
+/**
+ * SDK download configuration.
+ * Build number from: https://developer.android.com/studio#command-tools
+ */
+export const SDK_DOWNLOAD = {
+  BASE_URL: 'https://dl.google.com/android/repository/commandlinetools',
+  BUILD_NUMBER: '11076708',
+  MIN_JAVA_VERSION: 17,
+  MIN_DISK_SPACE: 5 * 1024 * 1024 * 1024,
+  DEFAULT_AVD_NAME: 'Caspian_Default',
+  DEFAULT_DEVICE_PROFILE: 'pixel_6',
+  PLATFORM_KEY: {
+    win32: 'win',
+    darwin: 'mac',
+    linux: 'linux',
+  } as Record<string, string>,
+} as const;
 
 export const SDK_TOOLS = {
   ADB: process.platform === 'win32' ? 'adb.exe' : 'adb',

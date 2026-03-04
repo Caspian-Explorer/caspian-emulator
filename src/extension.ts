@@ -25,9 +25,10 @@ let statusBarItem: vscode.StatusBarItem;
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   sdkManager = new SdkManager();
 
-  // Register SDK setup command first (always available)
+  // Register SDK setup commands first (always available)
   context.subscriptions.push(
-    vscode.commands.registerCommand(COMMANDS.SETUP_SDK, () => setupSdk(context))
+    vscode.commands.registerCommand(COMMANDS.SETUP_SDK, () => setupSdk(context)),
+    vscode.commands.registerCommand(COMMANDS.DOWNLOAD_SDK, () => downloadSdk(context)),
   );
 
   // Try to detect SDK automatically
@@ -38,10 +39,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Register placeholder views that prompt setup
     registerPlaceholderCommands(context);
     vscode.window.showInformationMessage(
-      'Android SDK not found. Please configure it to use Caspian Emulator.',
-      'Setup SDK'
+      'Android SDK not found. Install it automatically or configure an existing installation.',
+      'Install Android SDK',
+      'Configure Manually'
     ).then(choice => {
-      if (choice === 'Setup SDK') {
+      if (choice === 'Install Android SDK') {
+        vscode.commands.executeCommand(COMMANDS.DOWNLOAD_SDK);
+      } else if (choice === 'Configure Manually') {
         vscode.commands.executeCommand(COMMANDS.SETUP_SDK);
       }
     });
@@ -60,6 +64,16 @@ async function setupSdk(context: vscode.ExtensionContext): Promise<void> {
   if (sdk) {
     await initializeWithSdk(context, sdk);
     vscode.window.showInformationMessage('Android SDK configured successfully!');
+  }
+}
+
+async function downloadSdk(context: vscode.ExtensionContext): Promise<void> {
+  const sdk = await sdkManager.runDownloadWizard();
+  if (sdk) {
+    await initializeWithSdk(context, sdk);
+    if (avdTreeProvider) {
+      avdTreeProvider.refresh();
+    }
   }
 }
 

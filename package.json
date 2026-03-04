@@ -1,8 +1,8 @@
 {
   "name": "caspian-emulator",
   "displayName": "Caspian Emulator",
-  "description": "All-in-one Android emulator management: AVD control, embedded screen, ADB tools, logcat viewer, file explorer, and more.",
-  "version": "0.1.0",
+  "description": "Android emulator management for VS Code — no Android Studio required. AVD control, embedded screen, ADB tools, logcat viewer, file explorer, and automatic SDK setup.",
+  "version": "0.2.0",
   "publisher": "CaspianTools",
   "license": "MIT",
   "engines": {
@@ -62,6 +62,12 @@
         "command": "caspian.setupSdk",
         "title": "Setup Android SDK",
         "category": "Caspian"
+      },
+      {
+        "command": "caspian.downloadSdk",
+        "title": "Download & Install Android SDK",
+        "category": "Caspian",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "caspian.refreshAvds",
@@ -194,7 +200,7 @@
     "viewsWelcome": [
       {
         "view": "caspian.avdList",
-        "contents": "No Android SDK found.\n[Setup Android SDK](command:caspian.setupSdk)"
+        "contents": "No Android SDK found.\n[Download & Install Android SDK](command:caspian.downloadSdk)\n[Configure Existing SDK](command:caspian.setupSdk)"
       },
       {
         "view": "caspian.deviceList",
