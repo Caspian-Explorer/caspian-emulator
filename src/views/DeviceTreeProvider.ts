@@ -6,7 +6,13 @@ export class DeviceTreeItem extends vscode.TreeItem {
   constructor(public readonly device: DeviceInfo) {
     super(device.model, vscode.TreeItemCollapsibleState.None);
 
-    this.description = device.serial;
+    const stateDescriptions: Partial<Record<DeviceInfo['state'], string>> = {
+      unauthorized:    'Allow USB debugging on your phone',
+      offline:         'Device offline',
+      'no permissions': 'Run VS Code with elevated permissions',
+    };
+    this.description = stateDescriptions[device.state] ?? device.serial;
+
     this.tooltip = [
       `Serial: ${device.serial}`,
       `Model: ${device.model}`,
@@ -15,21 +21,27 @@ export class DeviceTreeItem extends vscode.TreeItem {
       `State: ${device.state}`,
     ].join('\n');
 
-    this.contextValue = device.type === 'emulator' ? 'device.emulator' : 'device.physical';
+    if (device.state === 'device') {
+      this.contextValue = device.type === 'emulator' ? 'device.emulator' : 'device.physical';
+    } else if (device.state === 'unauthorized') {
+      this.contextValue = 'device.unauthorized';
+    } else {
+      this.contextValue = 'device.inactive';
+    }
 
     const iconMap: Record<string, string> = {
-      device: device.type === 'emulator' ? 'vm-running' : 'device-mobile',
-      offline: 'debug-disconnect',
-      unauthorized: 'lock',
+      device:           device.type === 'emulator' ? 'vm-running' : 'device-mobile',
+      offline:          'debug-disconnect',
+      unauthorized:     'lock',
       'no permissions': 'warning',
     };
 
-    this.iconPath = new vscode.ThemeIcon(
-      iconMap[device.state] || 'question',
-      device.state === 'device'
-        ? new vscode.ThemeColor('testing.iconPassed')
-        : new vscode.ThemeColor('testing.iconFailed')
-    );
+    const iconColor =
+      device.state === 'device'       ? new vscode.ThemeColor('testing.iconPassed') :
+      device.state === 'unauthorized' ? new vscode.ThemeColor('list.warningForeground') :
+                                        new vscode.ThemeColor('testing.iconFailed');
+
+    this.iconPath = new vscode.ThemeIcon(iconMap[device.state] || 'question', iconColor);
   }
 }
 
@@ -62,9 +74,7 @@ export class DeviceTreeProvider implements vscode.TreeDataProvider<DeviceTreeIte
         // Tracker not ready
       }
     }
-    return this.devices
-      .filter(d => d.state === 'device')
-      .map(d => new DeviceTreeItem(d));
+    return this.devices.map(d => new DeviceTreeItem(d));
   }
 
   getDevices(): DeviceInfo[] {

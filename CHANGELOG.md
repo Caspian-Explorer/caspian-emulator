@@ -2,6 +2,24 @@
 
 All notable changes to Caspian Emulator will be documented in this file.
 
+## [0.3.0] - 2026-03-04
+
+### Added
+- **Named device presets** — Create AVDs from a curated list (Pixel 9 Pro, Pixel 8, Pixel Fold, Pixel Tablet, Nexus 5X, 7"/10" tablets) instead of raw system image strings
+  - Automatically downloads the required system image if not installed (~1 GB)
+  - AVD name pre-filled based on selected device and API level
+  - Architecture-aware: x86_64 on Intel/AMD, arm64-v8a on Apple Silicon
+- **USB phone connection guide** — "Connect Phone via USB" steps through Developer Options → USB Debugging → USB cable → Allow authorization
+- **Unauthorized device detection** — proactively notifies when a phone connects without USB debugging enabled
+- **All device states visible in sidebar** — unauthorized/offline devices now appear with contextual icons and descriptions
+- **"How to Connect a Phone" link** in the Connected Devices welcome view
+- ADB context menu items (Install APK, Screenshot, etc.) now only appear on ready devices
+
+## [0.2.2] - 2026-03-04
+
+### Fixed
+- Fix "error: closed" popup when opening the file explorer while an emulator is still booting — the error is now suppressed silently and the file explorer auto-retries every 5 seconds (up to 5 times) until the shell is ready
+
 ## [0.2.1] - 2026-03-04
 
 ### Fixed

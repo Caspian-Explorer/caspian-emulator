@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
-import { COMMANDS, VIEWS, CONFIG } from './constants';
+import { COMMANDS, VIEWS, CONFIG, DEVICE_PRESETS, getDefaultAbi } from './constants';
 import { SdkManager } from './sdk/SdkManager';
 import { AdbClient } from './adb/AdbClient';
 import { DeviceTracker } from './adb/DeviceTracker';
@@ -29,6 +29,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(
     vscode.commands.registerCommand(COMMANDS.SETUP_SDK, () => setupSdk(context)),
     vscode.commands.registerCommand(COMMANDS.DOWNLOAD_SDK, () => downloadSdk(context)),
+    vscode.commands.registerCommand(COMMANDS.CONNECT_PHONE, () => connectPhoneGuide()),
   );
 
   // Try to detect SDK automatically
@@ -96,6 +97,20 @@ async function initializeWithSdk(context: vscode.ExtensionContext, sdk: SdkInfo)
   // Register all commands
   registerCommands(context);
 
+  // Notify when a phone connects but isn't authorized yet
+  deviceTracker.on('deviceConnected', (device: DeviceInfo) => {
+    if (device.state === 'unauthorized') {
+      vscode.window.showInformationMessage(
+        `Phone detected. Check your phone screen and tap "Allow USB Debugging".`,
+        'How to Connect'
+      ).then(choice => {
+        if (choice === 'How to Connect') {
+          vscode.commands.executeCommand(COMMANDS.CONNECT_PHONE);
+        }
+      });
+    }
+  });
+
   // Start device tracking
   deviceTracker.on('devicesChanged', (devices: DeviceInfo[]) => {
     updateStatusBar(devices);
@@ -118,7 +133,9 @@ function registerPlaceholderCommands(context: vscode.ExtensionContext): void {
     });
   };
 
-  const commandIds = Object.values(COMMANDS).filter(c => c !== COMMANDS.SETUP_SDK);
+  const commandIds = Object.values(COMMANDS).filter(c =>
+    c !== COMMANDS.SETUP_SDK && c !== COMMANDS.DOWNLOAD_SDK && c !== COMMANDS.CONNECT_PHONE
+  );
   for (const cmd of commandIds) {
     context.subscriptions.push(
       vscode.commands.registerCommand(cmd, sdkRequired)
@@ -136,48 +153,102 @@ function registerCommands(context: vscode.ExtensionContext): void {
   reg(COMMANDS.REFRESH_AVDS, () => avdTreeProvider.refresh());
 
   reg(COMMANDS.CREATE_AVD, async () => {
-    const images = await avdManager.listSystemImages();
-    if (images.length === 0) {
-      vscode.window.showWarningMessage('No system images found. Install them via Android Studio SDK Manager.');
-      return;
-    }
-
-    const picked = await vscode.window.showQuickPick(
-      images.map(img => ({
-        label: `API ${img.apiLevel} - ${img.tag}/${img.abi}`,
-        description: img.installed ? 'Installed' : 'Not installed',
-        detail: img.path,
-        image: img,
-      })),
-      { placeHolder: 'Select a system image' }
+    const mode = await vscode.window.showQuickPick(
+      [
+        { label: '$(device-mobile) From preset', description: 'Pixel 9, Pixel 8, Pixel Fold, Tablet...', value: 'preset' },
+        { label: '$(settings-gear) Custom', description: 'Choose system image and device profile manually', value: 'custom' },
+      ],
+      { placeHolder: 'How do you want to create the virtual device?' }
     );
-    if (!picked) { return; }
+    if (!mode) { return; }
 
-    const name = await vscode.window.showInputBox({
-      prompt: 'Enter AVD name',
-      placeHolder: 'MyDevice',
-      validateInput: (v) => /^[a-zA-Z0-9_.-]+$/.test(v) ? null : 'Use only letters, numbers, underscores, dots, and hyphens',
-    });
-    if (!name) { return; }
-
-    const profiles = await avdManager.listDeviceProfiles();
-    let device: string | undefined;
-    if (profiles.length > 0) {
-      const profilePick = await vscode.window.showQuickPick(
-        profiles.map(p => ({ label: p.name, id: p.id })),
-        { placeHolder: 'Select a device profile (optional)' }
+    if (mode.value === 'preset') {
+      const abi = getDefaultAbi();
+      const presetPick = await vscode.window.showQuickPick(
+        DEVICE_PRESETS.map(p => ({
+          label: p.name,
+          description: `Android ${p.api}  •  ${abi}`,
+          preset: p,
+        })),
+        { placeHolder: 'Select a device' }
       );
-      device = profilePick?.id;
-    }
+      if (!presetPick) { return; }
 
-    await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: `Creating AVD "${name}"...` },
-      async () => {
-        await avdManager.createAvd(name, picked.detail, device);
+      const preset = presetPick.preset;
+      const defaultName = `${preset.name.replace(/[\s]/g, '_')}_API${preset.api}`;
+      const name = await vscode.window.showInputBox({
+        prompt: 'AVD name',
+        value: defaultName,
+        validateInput: (v) => /^[a-zA-Z0-9_.-]+$/.test(v) ? null : 'Use only letters, numbers, underscores, dots, and hyphens',
+      });
+      if (!name) { return; }
+
+      const systemImage = `system-images;android-${preset.api};${preset.tag};${abi}`;
+      const images = await avdManager.listSystemImages();
+      const alreadyInstalled = images.some(img => img.path === systemImage && img.installed);
+
+      if (!alreadyInstalled) {
+        const choice = await vscode.window.showWarningMessage(
+          `System image for ${preset.name} (Android ${preset.api}) is not installed. Download it now? (~1 GB)`,
+          'Download', 'Cancel'
+        );
+        if (choice !== 'Download') { return; }
+
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: `Downloading ${preset.name} system image...`, cancellable: false },
+          async () => { await avdManager.installSystemImage(systemImage); }
+        );
       }
-    );
-    avdTreeProvider.refresh();
-    vscode.window.showInformationMessage(`AVD "${name}" created.`);
+
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Creating ${preset.name} virtual device...` },
+        async () => { await avdManager.createAvd(name, systemImage, preset.profile); }
+      );
+      avdTreeProvider.refresh();
+      vscode.window.showInformationMessage(`${preset.name} virtual device "${name}" created.`);
+
+    } else {
+      // Custom flow
+      const images = await avdManager.listSystemImages();
+      if (images.length === 0) {
+        vscode.window.showWarningMessage('No system images found. Use the preset flow to download one automatically.');
+        return;
+      }
+
+      const picked = await vscode.window.showQuickPick(
+        images.map(img => ({
+          label: `API ${img.apiLevel} - ${img.tag}/${img.abi}`,
+          description: img.installed ? 'Installed' : 'Not installed',
+          detail: img.path,
+        })),
+        { placeHolder: 'Select a system image' }
+      );
+      if (!picked) { return; }
+
+      const name = await vscode.window.showInputBox({
+        prompt: 'Enter AVD name',
+        placeHolder: 'MyDevice',
+        validateInput: (v) => /^[a-zA-Z0-9_.-]+$/.test(v) ? null : 'Use only letters, numbers, underscores, dots, and hyphens',
+      });
+      if (!name) { return; }
+
+      const profiles = await avdManager.listDeviceProfiles();
+      let device: string | undefined;
+      if (profiles.length > 0) {
+        const profilePick = await vscode.window.showQuickPick(
+          profiles.map(p => ({ label: p.name, id: p.id })),
+          { placeHolder: 'Select a device profile (optional)' }
+        );
+        device = profilePick?.id;
+      }
+
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `Creating AVD "${name}"...` },
+        async () => { await avdManager.createAvd(name, picked.detail, device); }
+      );
+      avdTreeProvider.refresh();
+      vscode.window.showInformationMessage(`AVD "${name}" created.`);
+    }
   });
 
   reg(COMMANDS.LAUNCH_AVD, async (item?: AvdTreeItem) => {
@@ -429,8 +500,22 @@ async function syncRunningAvds(devices: DeviceInfo[]): Promise<void> {
 function autoSelectFileExplorerDevice(devices: DeviceInfo[]): void {
   if (!fileExplorerProvider) { return; }
   const connected = devices.filter(d => d.state === 'device');
-  if (connected.length > 0 && !fileExplorerProvider.getCurrentDevice()) {
-    fileExplorerProvider.setDevice(connected[0]);
+  if (connected.length === 0) { return; }
+
+  const current = fileExplorerProvider.getCurrentDevice();
+  if (!current) {
+    const device = connected[0];
+    fileExplorerProvider.setDevice(device);
+    // Emulators report state=device before the shell is ready — retry a few
+    // times so the file explorer populates automatically after boot
+    if (device.type === 'emulator') {
+      let attempts = 0;
+      const retry = setInterval(() => {
+        attempts++;
+        fileExplorerProvider.refresh();
+        if (attempts >= 5) { clearInterval(retry); }
+      }, 5000);
+    }
   }
 }
 
@@ -448,4 +533,19 @@ function updateStatusBar(devices: DeviceInfo[]): void {
 
 export function deactivate(): void {
   deviceTracker?.stop();
+}
+
+async function connectPhoneGuide(): Promise<void> {
+  const steps = [
+    'Step 1/4 — Enable Developer Options: Open Settings → About Phone → tap "Build Number" 7 times until you see "You are now a developer!"',
+    'Step 2/4 — Enable USB Debugging: Go to Settings → Developer Options → turn on "USB Debugging"',
+    'Step 3/4 — Connect via USB: Plug your phone into your computer with a USB data cable (not a charge-only cable)',
+    'Step 4/4 — Authorize the connection: A dialog will appear on your phone — tap "Allow USB Debugging". Check "Always allow from this computer" to skip this step in future.',
+  ];
+
+  for (let i = 0; i < steps.length; i++) {
+    const isLast = i === steps.length - 1;
+    const choice = await vscode.window.showInformationMessage(steps[i], isLast ? 'Done' : 'Next →', 'Cancel');
+    if (!choice || choice === 'Cancel') { return; }
+  }
 }

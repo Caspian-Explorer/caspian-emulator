@@ -31,17 +31,21 @@ No Android Studio. No manual path configuration. Just install the extension and 
 - Requires only **Java 17+** — everything else is handled
 
 ### AVD Management
-- Create, launch, stop, delete, and edit Android Virtual Devices from the sidebar
+- Create virtual devices by name — pick **Pixel 9 Pro**, **Pixel 8**, **Pixel Fold**, **Pixel Tablet**, and more from a preset list
+- System image downloaded automatically if not installed (~1 GB)
+- Launch, stop, delete, and edit AVDs from the sidebar
 - See running/stopped status at a glance with color-coded icons
-- Choose from available system images and device profiles
-- Edit AVD `config.ini` directly in VS Code
 - Custom emulator launch arguments via settings
+
+### Physical Phone Support
+- **Guided USB setup** — step-by-step walkthrough: Developer Options → USB Debugging → authorize connection
+- Unauthorized phones appear in the sidebar with a one-click "How to Connect" guide
+- Auto-notification when a phone is plugged in without USB debugging enabled
 
 ### Connected Devices
 - Live-updating list of all connected devices (emulators + physical USB devices)
+- Shows unauthorized and offline devices with contextual status messages
 - Auto-refreshes every 3 seconds via ADB polling
-- Shows model name, serial number, and connection state
-- Distinguishes emulators from physical devices with distinct icons
 
 ### ADB Controls
 - **Install APK** — select and install `.apk` files with one click
@@ -84,7 +88,7 @@ Browse the device filesystem from the sidebar:
 ### Install
 Search **"Caspian Emulator"** in the VS Code Extensions panel, or:
 ```bash
-code --install-extension caspian-emulator-0.2.1.vsix
+code --install-extension caspian-emulator-0.3.0.vsix
 ```
 
 ### First Launch
@@ -113,7 +117,8 @@ Open the Command Palette (`Ctrl+Shift+P`) and type **"Caspian"** to see all comm
 |---------|-------------|
 | Caspian: Download & Install Android SDK | Download SDK tools, emulator, and system image automatically |
 | Caspian: Setup Android SDK | Configure or browse for an existing SDK installation |
-| Caspian: Create AVD | Create a new Android Virtual Device |
+| Caspian: Connect Phone via USB | Step-by-step guide to enable USB debugging and authorize ADB |
+| Caspian: Create AVD | Create a virtual device by name (Pixel 9, Pixel 8, etc.) or custom image |
 | Caspian: Launch Emulator | Start an emulator for a selected AVD |
 | Caspian: Stop Emulator | Stop a running emulator |
 | Caspian: Delete AVD | Delete a virtual device |
