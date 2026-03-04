@@ -3,6 +3,7 @@ export const EXTENSION_ID = 'caspian-emulator';
 export const COMMANDS = {
   SETUP_SDK: 'caspian.setupSdk',
   DOWNLOAD_SDK: 'caspian.downloadSdk',
+  CONNECT_PHONE: 'caspian.connectPhone',
   REFRESH_AVDS: 'caspian.refreshAvds',
   CREATE_AVD: 'caspian.createAvd',
   LAUNCH_AVD: 'caspian.launchAvd',
@@ -71,6 +72,38 @@ export const SDK_DOWNLOAD = {
     linux: 'linux',
   } as Record<string, string>,
 } as const;
+
+export interface DevicePreset {
+  name: string;
+  profile: string;
+  api: number;
+  tag: string;
+}
+
+/** Curated list of popular Android devices for one-click AVD creation */
+export const DEVICE_PRESETS: DevicePreset[] = [
+  { name: 'Pixel 9 Pro',         profile: 'pixel_9_pro',            api: 35, tag: 'google_apis' },
+  { name: 'Pixel 9',             profile: 'pixel_9',                api: 35, tag: 'google_apis' },
+  { name: 'Pixel 8 Pro',         profile: 'pixel_8_pro',            api: 34, tag: 'google_apis' },
+  { name: 'Pixel 8',             profile: 'pixel_8',                api: 34, tag: 'google_apis' },
+  { name: 'Pixel 7 Pro',         profile: 'pixel_7_pro',            api: 33, tag: 'google_apis' },
+  { name: 'Pixel 7',             profile: 'pixel_7',                api: 33, tag: 'google_apis' },
+  { name: 'Pixel 7a',            profile: 'pixel_7a',               api: 33, tag: 'google_apis' },
+  { name: 'Pixel 6 Pro',         profile: 'pixel_6_pro',            api: 32, tag: 'google_apis' },
+  { name: 'Pixel 6',             profile: 'pixel_6',                api: 32, tag: 'google_apis' },
+  { name: 'Pixel 6a',            profile: 'pixel_6a',               api: 32, tag: 'google_apis' },
+  { name: 'Pixel Fold',          profile: 'pixel_fold',             api: 34, tag: 'google_apis' },
+  { name: 'Pixel Tablet',        profile: 'pixel_tablet',           api: 34, tag: 'google_apis' },
+  { name: 'Pixel 4 XL',          profile: 'pixel_4_xl',             api: 30, tag: 'google_apis' },
+  { name: 'Nexus 5X',            profile: 'Nexus 5X',               api: 28, tag: 'google_apis' },
+  { name: '7" Tablet',           profile: '7in WSVGA (Tablet)',     api: 35, tag: 'google_apis' },
+  { name: '10" Tablet',          profile: '10.1in WXGA (Tablet)',   api: 35, tag: 'google_apis' },
+];
+
+/** Returns the appropriate system image ABI for the current machine */
+export function getDefaultAbi(): string {
+  return process.platform === 'darwin' && process.arch === 'arm64' ? 'arm64-v8a' : 'x86_64';
+}
 
 export const SDK_TOOLS = {
   ADB: process.platform === 'win32' ? 'adb.exe' : 'adb',

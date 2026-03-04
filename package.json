@@ -2,7 +2,7 @@
   "name": "caspian-emulator",
   "displayName": "Caspian Emulator",
   "description": "Android emulator management for VS Code — no Android Studio required. AVD control, embedded screen, ADB tools, logcat viewer, file explorer, and automatic SDK setup.",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "publisher": "CaspianTools",
   "license": "MIT",
   "engines": {
@@ -25,11 +25,7 @@
     "url": "https://github.com/caspian-explorer/caspian-emulator"
   },
   "main": "./out/extension.js",
-  "activationEvents": [
-    "onView:caspian.avdList",
-    "onView:caspian.deviceList",
-    "onView:caspian.fileExplorer"
-  ],
+  "activationEvents": [],
   "contributes": {
     "configuration": {
       "title": "Caspian Emulator",
@@ -68,6 +64,12 @@
         "title": "Download & Install Android SDK",
         "category": "Caspian",
         "icon": "$(cloud-download)"
+      },
+      {
+        "command": "caspian.connectPhone",
+        "title": "Connect Phone via USB",
+        "category": "Caspian",
+        "icon": "$(plug)"
       },
       {
         "command": "caspian.refreshAvds",
@@ -204,7 +206,7 @@
       },
       {
         "view": "caspian.deviceList",
-        "contents": "No devices connected.\nLaunch an emulator or connect a device via USB."
+        "contents": "No devices connected.\nLaunch an emulator or connect a phone via USB.\n[How to Connect a Phone](command:caspian.connectPhone)"
       }
     ],
     "menus": {
@@ -257,28 +259,33 @@
           "group": "2_delete"
         },
         {
+          "command": "caspian.connectPhone",
+          "when": "view == caspian.deviceList && viewItem == device.unauthorized",
+          "group": "inline"
+        },
+        {
           "command": "caspian.installApk",
-          "when": "view == caspian.deviceList",
+          "when": "view == caspian.deviceList && viewItem =~ /^device\\.(emulator|physical)$/",
           "group": "1_actions"
         },
         {
           "command": "caspian.takeScreenshot",
-          "when": "view == caspian.deviceList",
+          "when": "view == caspian.deviceList && viewItem =~ /^device\\.(emulator|physical)$/",
           "group": "1_actions"
         },
         {
           "command": "caspian.recordScreen",
-          "when": "view == caspian.deviceList",
+          "when": "view == caspian.deviceList && viewItem =~ /^device\\.(emulator|physical)$/",
           "group": "1_actions"
         },
         {
           "command": "caspian.openShell",
-          "when": "view == caspian.deviceList",
+          "when": "view == caspian.deviceList && viewItem =~ /^device\\.(emulator|physical)$/",
           "group": "2_tools"
         },
         {
           "command": "caspian.showLogcat",
-          "when": "view == caspian.deviceList",
+          "when": "view == caspian.deviceList && viewItem =~ /^device\\.(emulator|physical)$/",
           "group": "2_tools"
         },
         {

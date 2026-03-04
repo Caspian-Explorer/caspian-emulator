@@ -69,6 +69,11 @@ export class FileExplorerProvider implements vscode.TreeDataProvider<FileTreeIte
       });
       return files.map(f => new FileTreeItem(f, serial));
     } catch (err) {
+      const msg = String(err);
+      // Device shell not ready yet (emulator still booting) — suppress the popup
+      if (msg.includes('error: closed') || msg.includes('device offline') || msg.includes('error: no devices')) {
+        return [];
+      }
       vscode.window.showErrorMessage(`Failed to list files: ${err}`);
       return [];
     }

@@ -190,6 +190,27 @@ export class AvdManager {
     });
   }
 
+  /** Install a system image via sdkmanager */
+  async installSystemImage(systemImage: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const proc = execFile(
+        this.sdk.sdkmanagerPath,
+        ['--install', systemImage],
+        { maxBuffer: 50 * 1024 * 1024, ...(process.platform === 'win32' ? { shell: true } : {}) },
+        (err, _stdout, stderr) => {
+          if (err) {
+            reject(new Error(`Failed to install system image: ${stderr || err.message}`));
+          } else {
+            resolve();
+          }
+        }
+      );
+      // Accept any license prompts
+      proc.stdin?.write('y\n'.repeat(10));
+      proc.stdin?.end();
+    });
+  }
+
   /** Delete an AVD */
   async deleteAvd(name: string): Promise<void> {
     await this.execAvdManager(['delete', 'avd', '-n', name]);
