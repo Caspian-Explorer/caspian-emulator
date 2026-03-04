@@ -221,6 +221,7 @@ export class SdkDownloader {
     return new Promise((resolve, reject) => {
       const proc = spawn(sdkmanagerPath, ['--licenses'], {
         stdio: ['pipe', 'pipe', 'pipe'],
+        ...(process.platform === 'win32' ? { shell: true } : {}),
       });
 
       // Keep piping "y" for all license prompts
@@ -272,6 +273,7 @@ export class SdkDownloader {
     return new Promise((resolve, reject) => {
       const proc = spawn(sdkmanagerPath, [packageName], {
         stdio: ['pipe', 'pipe', 'pipe'],
+        ...(process.platform === 'win32' ? { shell: true } : {}),
       });
 
       // Auto-accept any prompts
@@ -311,7 +313,10 @@ export class SdkDownloader {
         '--force',
       ];
 
-      const proc = spawn(avdmanagerPath, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+      const proc = spawn(avdmanagerPath, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        ...(process.platform === 'win32' ? { shell: true } : {}),
+      });
 
       // Auto-answer "no" to custom hardware profile
       proc.stdin?.write('no\n');

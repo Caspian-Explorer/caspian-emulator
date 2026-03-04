@@ -15,7 +15,7 @@ export class AvdManager {
   /** Execute avdmanager command */
   private execAvdManager(args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
-      execFile(this.sdk.avdmanagerPath, args, { maxBuffer: 5 * 1024 * 1024 }, (err, stdout, stderr) => {
+      execFile(this.sdk.avdmanagerPath, args, { maxBuffer: 5 * 1024 * 1024, ...(process.platform === 'win32' ? { shell: true } : {}) }, (err, stdout, stderr) => {
         if (err) {
           reject(new Error(`avdmanager ${args.join(' ')} failed: ${stderr || err.message}`));
           return;
@@ -124,7 +124,7 @@ export class AvdManager {
 
   private async parseSystemImagesFromSdk(): Promise<SystemImage[]> {
     return new Promise((resolve, reject) => {
-      execFile(this.sdk.sdkmanagerPath, ['--list'], { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+      execFile(this.sdk.sdkmanagerPath, ['--list'], { maxBuffer: 10 * 1024 * 1024, ...(process.platform === 'win32' ? { shell: true } : {}) }, (err, stdout) => {
         if (err) {
           resolve([]);
           return;
@@ -176,7 +176,7 @@ export class AvdManager {
     }
 
     return new Promise((resolve, reject) => {
-      const proc = spawn(this.sdk.avdmanagerPath, args, { stdio: 'pipe' });
+      const proc = spawn(this.sdk.avdmanagerPath, args, { stdio: 'pipe', ...(process.platform === 'win32' ? { shell: true } : {}) });
       // Auto-answer "no" to custom hardware profile
       proc.stdin?.write('no\n');
       proc.stdin?.end();
