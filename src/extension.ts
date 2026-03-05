@@ -200,9 +200,20 @@ function registerCommands(context: vscode.ExtensionContext): void {
         );
       }
 
+      const availableProfiles = await avdManager.listDeviceProfiles();
+      let deviceProfile: string | undefined = preset.profile;
+      if (availableProfiles.length > 0 && !availableProfiles.some(p => p.id === preset.profile)) {
+        const choice = await vscode.window.showWarningMessage(
+          `Device profile "${preset.name}" is not available in your SDK version. You can still create the AVD without a device skin.`,
+          'Create anyway', 'Cancel'
+        );
+        if (choice !== 'Create anyway') { return; }
+        deviceProfile = undefined;
+      }
+
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: `Creating ${preset.name} virtual device...` },
-        async () => { await avdManager.createAvd(name, systemImage, preset.profile); }
+        async () => { await avdManager.createAvd(name, systemImage, deviceProfile); }
       );
       avdTreeProvider.refresh();
       vscode.window.showInformationMessage(`${preset.name} virtual device "${name}" created.`);
