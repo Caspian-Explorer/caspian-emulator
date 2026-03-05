@@ -2,6 +2,11 @@
 
 All notable changes to Caspian Emulator will be documented in this file.
 
+## [0.3.1] - 2026-03-05
+
+### Fixed
+- AVD creation from preset no longer fails with "No device found" on older SDK command-line tools — if the preset's device profile (e.g. `pixel_9_pro`) is not available in the installed SDK, the user is prompted to create the AVD without a device skin instead of crashing
+
 ## [0.3.0] - 2026-03-04
 
 ### Added
