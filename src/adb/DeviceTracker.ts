@@ -1,7 +1,10 @@
-import { spawn, ChildProcess } from 'child_process';
+import { ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
+import * as vscode from 'vscode';
 import { SdkInfo, DeviceInfo } from '../types';
 import { AdbClient } from './AdbClient';
+import { CONFIG } from '../constants';
+import { Logger } from '../utils/Logger';
 
 export interface DeviceTrackerEvents {
   devicesChanged: (devices: DeviceInfo[]) => void;
@@ -11,7 +14,7 @@ export interface DeviceTrackerEvents {
 }
 
 /**
- * Monitors device connections using `adb track-devices` and periodic polling.
+ * Monitors device connections using periodic polling.
  */
 export class DeviceTracker extends EventEmitter {
   private adbClient: AdbClient;
@@ -32,9 +35,12 @@ export class DeviceTracker extends EventEmitter {
     if (this.running) { return; }
     this.running = true;
 
-    // Use polling as primary mechanism (cross-platform reliable)
+    const interval = vscode.workspace.getConfiguration(CONFIG.SECTION)
+      .get<number>(CONFIG.DEVICE_TRACKER_INTERVAL, 3) * 1000;
+
     this.poll();
-    this.pollInterval = setInterval(() => this.poll(), 3000);
+    this.pollInterval = setInterval(() => this.poll(), interval);
+    Logger.info(`Device tracker started (polling every ${interval / 1000}s)`);
   }
 
   /** Stop monitoring */
@@ -49,6 +55,7 @@ export class DeviceTracker extends EventEmitter {
       this.pollInterval = undefined;
     }
     this.currentDevices.clear();
+    Logger.info('Device tracker stopped');
   }
 
   private async poll(): Promise<void> {
@@ -67,9 +74,11 @@ export class DeviceTracker extends EventEmitter {
         const existing = this.currentDevices.get(serial);
         if (!existing) {
           changed = true;
+          Logger.info(`Device connected: ${device.model} (${serial}) [${device.state}]`);
           this.emit('deviceConnected', device);
         } else if (existing.state !== device.state) {
           changed = true;
+          Logger.info(`Device state changed: ${serial} ${existing.state} → ${device.state}`);
         }
       }
 
@@ -77,6 +86,7 @@ export class DeviceTracker extends EventEmitter {
       for (const [serial, device] of this.currentDevices) {
         if (!newMap.has(serial)) {
           changed = true;
+          Logger.info(`Device disconnected: ${device.model} (${serial})`);
           this.emit('deviceDisconnected', device);
         }
       }

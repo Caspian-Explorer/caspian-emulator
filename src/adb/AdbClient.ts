@@ -1,5 +1,6 @@
 import { spawn, execFile } from 'child_process';
 import { SdkInfo, DeviceInfo, LogcatEntry, DeviceFile } from '../types';
+import { Logger } from '../utils/Logger';
 
 export class AdbClient {
   private adbPath: string;
@@ -12,14 +13,45 @@ export class AdbClient {
   exec(args: string[], serial?: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const fullArgs = serial ? ['-s', serial, ...args] : args;
+      Logger.debug(`adb ${fullArgs.join(' ')}`);
       execFile(this.adbPath, fullArgs, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
         if (err) {
-          reject(new Error(`adb ${fullArgs.join(' ')} failed: ${stderr || err.message}`));
+          let msg = `adb ${fullArgs.join(' ')} failed: ${stderr || err.message}`;
+          // Provide actionable message for common ADB daemon issues
+          if (stderr && (stderr.includes('daemon not running') || stderr.includes('cannot connect to daemon'))) {
+            msg = `ADB daemon failed to start. Make sure no other process is using port 5037, then try "Caspian: Refresh Device List". Details: ${stderr.trim()}`;
+          }
+          Logger.error(msg);
+          reject(new Error(msg));
           return;
         }
         resolve(stdout);
       });
     });
+  }
+
+  /** Execute an ADB command with automatic retry for transient failures */
+  async execWithRetry(args: string[], serial?: string, retries: number = 3): Promise<string> {
+    let lastError: Error | undefined;
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        return await this.exec(args, serial);
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        const msg = lastError.message;
+        // Only retry on transient errors
+        const transient = msg.includes('device offline') ||
+          msg.includes('error: closed') ||
+          msg.includes('no devices') ||
+          msg.includes('Connection refused') ||
+          msg.includes('ETIMEDOUT') ||
+          msg.includes('protocol fault');
+        if (!transient || attempt === retries) { break; }
+        Logger.warn(`Transient ADB error (attempt ${attempt}/${retries}), retrying in ${attempt}s...`);
+        await new Promise(r => setTimeout(r, attempt * 1000));
+      }
+    }
+    throw lastError;
   }
 
   /** Get list of connected devices */
@@ -65,6 +97,7 @@ export class AdbClient {
     onProgress?.('Uploading APK...');
     await this.exec(['install', '-r', apkPath], serial);
     onProgress?.('APK installed successfully.');
+    Logger.info(`APK installed on ${serial}: ${apkPath}`);
   }
 
   /** Take a screenshot and save to local path */
@@ -73,11 +106,13 @@ export class AdbClient {
     await this.exec(['shell', 'screencap', '-p', remotePath], serial);
     await this.exec(['pull', remotePath, localPath], serial);
     await this.exec(['shell', 'rm', remotePath], serial);
+    Logger.info(`Screenshot saved: ${localPath}`);
   }
 
   /** Start screen recording, returns the spawned process */
   startScreenRecording(serial: string, remotePath: string = '/sdcard/caspian_recording.mp4') {
     const args = ['-s', serial, 'shell', 'screenrecord', remotePath];
+    Logger.info(`Screen recording started on ${serial}`);
     return spawn(this.adbPath, args);
   }
 
@@ -85,6 +120,7 @@ export class AdbClient {
   async pullScreenRecording(serial: string, localPath: string, remotePath: string = '/sdcard/caspian_recording.mp4'): Promise<void> {
     await this.exec(['pull', remotePath, localPath], serial);
     await this.exec(['shell', 'rm', remotePath], serial);
+    Logger.info(`Screen recording saved: ${localPath}`);
   }
 
   /** List files in a directory on the device */
@@ -144,12 +180,30 @@ export class AdbClient {
     }
   }
 
+  /** Create a directory on the device */
+  async createDirectory(serial: string, remotePath: string): Promise<void> {
+    await this.exec(['shell', 'mkdir', '-p', remotePath], serial);
+    Logger.info(`Created directory on ${serial}: ${remotePath}`);
+  }
+
+  /** Rename/move a file on the device */
+  async renameFile(serial: string, oldPath: string, newPath: string): Promise<void> {
+    await this.exec(['shell', 'mv', oldPath, newPath], serial);
+    Logger.info(`Renamed on ${serial}: ${oldPath} → ${newPath}`);
+  }
+
+  /** Read a small text file from the device */
+  async readFile(serial: string, remotePath: string): Promise<string> {
+    return await this.exec(['shell', 'cat', remotePath], serial);
+  }
+
   /** Start logcat stream, returns spawned process */
   startLogcat(serial: string, filter?: string) {
     const args = ['-s', serial, 'logcat', '-v', 'threadtime'];
     if (filter) {
       args.push(filter);
     }
+    Logger.info(`Logcat started for ${serial}${filter ? ` (filter: ${filter})` : ''}`);
     return spawn(this.adbPath, args);
   }
 
@@ -179,5 +233,75 @@ export class AdbClient {
     } catch {
       return '';
     }
+  }
+
+  // ── App management ──
+
+  /** List installed packages on a device */
+  async listPackages(serial: string, thirdPartyOnly: boolean = true): Promise<string[]> {
+    const args = ['shell', 'pm', 'list', 'packages'];
+    if (thirdPartyOnly) { args.push('-3'); }
+    const output = await this.exec(args, serial);
+    return output.trim().split('\n')
+      .filter(Boolean)
+      .map(line => line.replace('package:', '').trim())
+      .sort();
+  }
+
+  /** Launch an app by package name */
+  async launchApp(serial: string, packageName: string): Promise<void> {
+    await this.exec(['shell', 'monkey', '-p', packageName, '-c', 'android.intent.category.LAUNCHER', '1'], serial);
+    Logger.info(`Launched app on ${serial}: ${packageName}`);
+  }
+
+  /** Force stop an app */
+  async forceStopApp(serial: string, packageName: string): Promise<void> {
+    await this.exec(['shell', 'am', 'force-stop', packageName], serial);
+    Logger.info(`Force stopped on ${serial}: ${packageName}`);
+  }
+
+  /** Clear app data */
+  async clearAppData(serial: string, packageName: string): Promise<void> {
+    await this.exec(['shell', 'pm', 'clear', packageName], serial);
+    Logger.info(`Cleared data on ${serial}: ${packageName}`);
+  }
+
+  /** Uninstall an app */
+  async uninstallApp(serial: string, packageName: string): Promise<void> {
+    await this.exec(['uninstall', packageName], serial);
+    Logger.info(`Uninstalled on ${serial}: ${packageName}`);
+  }
+
+  /** Get PIDs for a given package name (for logcat filtering) */
+  async getPackagePids(serial: string, packageName: string): Promise<string[]> {
+    try {
+      const output = await this.exec(['shell', 'pidof', packageName], serial);
+      return output.trim().split(/\s+/).filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
+
+  // ── Wireless ADB ──
+
+  /** Connect to a device over TCP/IP */
+  async connectTcp(address: string): Promise<string> {
+    const output = await this.exec(['connect', address]);
+    Logger.info(`TCP connect: ${address} → ${output.trim()}`);
+    return output.trim();
+  }
+
+  /** Disconnect a TCP device */
+  async disconnectTcp(address: string): Promise<string> {
+    const output = await this.exec(['disconnect', address]);
+    Logger.info(`TCP disconnect: ${address}`);
+    return output.trim();
+  }
+
+  /** Pair with a device for wireless debugging (Android 11+) */
+  async pair(address: string, code: string): Promise<string> {
+    const output = await this.exec(['pair', address, code]);
+    Logger.info(`Paired with ${address}`);
+    return output.trim();
   }
 }

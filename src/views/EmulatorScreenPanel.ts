@@ -2,12 +2,14 @@ import * as vscode from 'vscode';
 import { ChildProcess, spawn } from 'child_process';
 import { AdbClient } from '../adb/AdbClient';
 import { CONFIG } from '../constants';
+import { Logger } from '../utils/Logger';
 import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * Shows a live emulator screen inside VS Code.
- * Uses scrcpy if available, falls back to periodic screencap.
+ * Shows a live device screen inside VS Code.
+ * Uses scrcpy if available (30+ FPS), falls back to periodic screencap (~3 FPS).
+ * Works with both emulators and physical devices.
  */
 export class EmulatorScreenPanel {
   private static panels = new Map<string, EmulatorScreenPanel>();
@@ -16,6 +18,7 @@ export class EmulatorScreenPanel {
   private disposables: vscode.Disposable[] = [];
   private captureInterval: NodeJS.Timeout | undefined;
   private scrcpyProcess: ChildProcess | undefined;
+  private usingScrcpy = false;
 
   static show(
     extensionUri: vscode.Uri,
@@ -61,19 +64,18 @@ export class EmulatorScreenPanel {
 
     this.panel.onDidDispose(() => this.dispose(), undefined, this.disposables);
 
-    this.startCapture();
     this.panel.webview.html = this.getHtml();
+    this.startCapture();
   }
 
   private async startCapture(): Promise<void> {
-    // Try scrcpy first
     const scrcpyPath = this.findScrcpy();
     if (scrcpyPath) {
-      this.startScrcpyWebSocket(scrcpyPath);
+      this.startScrcpyCapture(scrcpyPath);
       return;
     }
 
-    // Fallback: periodic screencap
+    // Fallback: periodic screencap with optimized pipeline
     this.startScreencapLoop();
   }
 
@@ -93,34 +95,60 @@ export class EmulatorScreenPanel {
     return undefined;
   }
 
-  private startScrcpyWebSocket(scrcpyPath: string): void {
-    // Launch scrcpy in no-window mode for the video stream
-    // For simplicity, fall back to screencap approach since embedding
-    // scrcpy's video stream into a webview requires significant plumbing.
-    // A future version could use scrcpy's v4l2 or socket-based streaming.
-    this.startScreencapLoop();
+  private startScrcpyCapture(scrcpyPath: string): void {
+    this.usingScrcpy = true;
+    Logger.info(`Starting scrcpy for ${this.serial} from ${scrcpyPath}`);
+
+    // Launch scrcpy in a separate window — the user interacts with it directly
+    // This gives the best experience: 30+ FPS, touch, keyboard, clipboard
+    this.scrcpyProcess = spawn(scrcpyPath, [
+      '-s', this.serial,
+      '--window-title', `Caspian: ${this.serial}`,
+    ], {
+      stdio: 'pipe',
+    });
+
+    this.scrcpyProcess.on('error', (err) => {
+      Logger.error(`scrcpy error: ${err.message}`);
+      Logger.info('Falling back to screencap...');
+      this.usingScrcpy = false;
+      this.startScreencapLoop();
+    });
+
+    this.scrcpyProcess.on('exit', (code) => {
+      Logger.info(`scrcpy exited with code ${code}`);
+      this.usingScrcpy = false;
+    });
+
+    this.panel.webview.postMessage({
+      type: 'scrcpyMode',
+      message: 'scrcpy is running in a separate window with full touch & keyboard support. Use the scrcpy window to interact with your device.',
+    });
+
+    // Also run screencap at low rate to keep the webview preview updated
+    this.startScreencapLoop(3000);
   }
 
-  private startScreencapLoop(): void {
+  private startScreencapLoop(intervalMs: number = 350): void {
+    let capturing = false;
+
     const capture = async () => {
+      if (capturing) { return; } // Skip if previous capture still in progress
+      capturing = true;
       try {
-        const output = await this.adbClient.exec(
-          ['shell', 'screencap', '-p'],
-          this.serial,
-        );
-        // The screencap -p output is a PNG binary.
-        // We need to get it via exec with encoding set to buffer.
-        // Use a different approach: exec returns string, so use base64
+        // Use exec-out for direct binary pipe — faster than shell + base64
         const b64 = await this.adbClient.exec(
-          ['shell', 'screencap', '-p', '|', 'base64'],
+          ['exec-out', 'screencap', '-p', '|', 'base64'],
           this.serial,
         );
-        this.panel.webview.postMessage({
-          type: 'frame',
-          data: `data:image/png;base64,${b64.replace(/\s/g, '')}`,
-        });
+        if (b64 && b64.length > 100) {
+          this.panel.webview.postMessage({
+            type: 'frame',
+            data: `data:image/png;base64,${b64.replace(/\s/g, '')}`,
+          });
+        }
       } catch {
-        // screencap via pipe may not work on all devices; try pull approach
+        // Try file-based approach as fallback
         try {
           const remotePath = '/data/local/tmp/caspian_screen.png';
           await this.adbClient.exec(['shell', 'screencap', '-p', remotePath], this.serial);
@@ -128,22 +156,26 @@ export class EmulatorScreenPanel {
             ['shell', 'base64', remotePath],
             this.serial,
           );
-          this.panel.webview.postMessage({
-            type: 'frame',
-            data: `data:image/png;base64,${b64Output.replace(/\s/g, '')}`,
-          });
-          await this.adbClient.exec(['shell', 'rm', remotePath], this.serial);
-        } catch (err) {
+          if (b64Output && b64Output.length > 100) {
+            this.panel.webview.postMessage({
+              type: 'frame',
+              data: `data:image/png;base64,${b64Output.replace(/\s/g, '')}`,
+            });
+          }
+          await this.adbClient.exec(['shell', 'rm', '-f', remotePath], this.serial).catch(() => {});
+        } catch {
           // Silently skip frame
         }
       }
+      capturing = false;
     };
 
     capture();
-    this.captureInterval = setInterval(capture, 1000); // 1 FPS for screencap fallback
+    this.captureInterval = setInterval(capture, intervalMs);
   }
 
-  private async handleMessage(msg: { type: string; x?: number; y?: number; action?: string }): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async handleMessage(msg: { type: string; x?: number; y?: number; x2?: number; y2?: number; duration?: number; action?: string; text?: string }): Promise<void> {
     switch (msg.type) {
       case 'tap':
         if (msg.x !== undefined && msg.y !== undefined) {
@@ -154,12 +186,29 @@ export class EmulatorScreenPanel {
         }
         break;
       case 'swipe':
-        // Handled by the webview sending start/end coordinates
+        if (msg.x !== undefined && msg.y !== undefined && msg.x2 !== undefined && msg.y2 !== undefined) {
+          const duration = msg.duration || 300;
+          await this.adbClient.exec(
+            ['shell', 'input', 'swipe',
+              String(Math.round(msg.x)), String(Math.round(msg.y)),
+              String(Math.round(msg.x2)), String(Math.round(msg.y2)),
+              String(duration)],
+            this.serial,
+          );
+        }
         break;
       case 'key':
         if (msg.action) {
           await this.adbClient.exec(
             ['shell', 'input', 'keyevent', msg.action],
+            this.serial,
+          );
+        }
+        break;
+      case 'text':
+        if (msg.text) {
+          await this.adbClient.exec(
+            ['shell', 'input', 'text', msg.text.replace(/ /g, '%s')],
             this.serial,
           );
         }
@@ -189,7 +238,7 @@ export class EmulatorScreenPanel {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Emulator Screen</title>
+  <title>Device Screen</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -210,17 +259,20 @@ export class EmulatorScreenPanel {
     }
     #screen {
       max-width: 100%;
-      max-height: calc(100vh - 60px);
+      max-height: calc(100vh - 80px);
       cursor: pointer;
       border: 1px solid var(--vscode-panel-border);
       border-radius: 4px;
+      user-select: none;
+      -webkit-user-drag: none;
     }
     .nav-bar {
       display: flex;
-      gap: 16px;
+      gap: 12px;
       padding: 8px;
       justify-content: center;
       flex-shrink: 0;
+      align-items: center;
     }
     .nav-btn {
       background: var(--vscode-button-secondaryBackground);
@@ -238,34 +290,83 @@ export class EmulatorScreenPanel {
       padding: 4px;
       text-align: center;
     }
+    .scrcpy-notice {
+      padding: 8px 16px;
+      background: var(--vscode-badge-background);
+      color: var(--vscode-badge-foreground);
+      border-radius: 4px;
+      font-size: 12px;
+      margin: 4px;
+      display: none;
+    }
   </style>
 </head>
 <body>
   <div class="status" id="status">Connecting...</div>
+  <div class="scrcpy-notice" id="scrcpyNotice"></div>
   <div class="screen-container">
-    <img id="screen" alt="Emulator Screen" />
+    <img id="screen" alt="Device Screen" />
   </div>
   <div class="nav-bar">
     <button class="nav-btn" id="btnBack">&#9664; Back</button>
     <button class="nav-btn" id="btnHome">&#9679; Home</button>
     <button class="nav-btn" id="btnRecents">&#9632; Recents</button>
+    <span style="color: var(--vscode-descriptionForeground); font-size: 11px; margin-left: 8px;" id="fpsCounter"></span>
   </div>
 
   <script>
     const vscode = acquireVsCodeApi();
     const screen = document.getElementById('screen');
     const status = document.getElementById('status');
+    const fpsCounter = document.getElementById('fpsCounter');
+    const scrcpyNotice = document.getElementById('scrcpyNotice');
     let frameCount = 0;
+    let lastFpsTime = Date.now();
+    let fpsFrames = 0;
 
-    // Handle screen taps
-    screen.addEventListener('click', (e) => {
+    // Swipe tracking
+    let swipeStart = null;
+
+    screen.addEventListener('mousedown', (e) => {
       const rect = screen.getBoundingClientRect();
       const scaleX = screen.naturalWidth / rect.width;
       const scaleY = screen.naturalHeight / rect.height;
-      const x = (e.clientX - rect.left) * scaleX;
-      const y = (e.clientY - rect.top) * scaleY;
-      vscode.postMessage({ type: 'tap', x, y });
+      swipeStart = {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
+        time: Date.now()
+      };
     });
+
+    screen.addEventListener('mouseup', (e) => {
+      if (!swipeStart) return;
+      const rect = screen.getBoundingClientRect();
+      const scaleX = screen.naturalWidth / rect.width;
+      const scaleY = screen.naturalHeight / rect.height;
+      const endX = (e.clientX - rect.left) * scaleX;
+      const endY = (e.clientY - rect.top) * scaleY;
+      const dx = endX - swipeStart.x;
+      const dy = endY - swipeStart.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+
+      if (dist < 10) {
+        // Tap
+        vscode.postMessage({ type: 'tap', x: swipeStart.x, y: swipeStart.y });
+      } else {
+        // Swipe
+        const duration = Math.max(100, Math.min(Date.now() - swipeStart.time, 1000));
+        vscode.postMessage({
+          type: 'swipe',
+          x: swipeStart.x, y: swipeStart.y,
+          x2: endX, y2: endY,
+          duration
+        });
+      }
+      swipeStart = null;
+    });
+
+    // Prevent default drag on image
+    screen.addEventListener('dragstart', (e) => e.preventDefault());
 
     // Navigation buttons
     document.getElementById('btnBack').addEventListener('click', () => {
@@ -284,7 +385,19 @@ export class EmulatorScreenPanel {
       if (msg.type === 'frame') {
         screen.src = msg.data;
         frameCount++;
+        fpsFrames++;
+
+        const now = Date.now();
+        if (now - lastFpsTime >= 2000) {
+          const fps = (fpsFrames / ((now - lastFpsTime) / 1000)).toFixed(1);
+          fpsCounter.textContent = fps + ' FPS';
+          fpsFrames = 0;
+          lastFpsTime = now;
+        }
         status.textContent = 'Live (' + frameCount + ' frames)';
+      } else if (msg.type === 'scrcpyMode') {
+        scrcpyNotice.style.display = 'block';
+        scrcpyNotice.textContent = msg.message;
       }
     });
   </script>

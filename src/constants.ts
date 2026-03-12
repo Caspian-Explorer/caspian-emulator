@@ -21,6 +21,24 @@ export const COMMANDS = {
   PULL_FILE: 'caspian.pullFile',
   PUSH_FILE: 'caspian.pushFile',
   DELETE_FILE: 'caspian.deleteFile',
+  CREATE_FOLDER: 'caspian.createFolder',
+  RENAME_FILE: 'caspian.renameFile',
+  OPEN_REMOTE_FILE: 'caspian.openRemoteFile',
+  SELECT_DEVICE: 'caspian.selectDevice',
+  SHOW_OUTPUT: 'caspian.showOutput',
+  // App management
+  LIST_PACKAGES: 'caspian.listPackages',
+  LAUNCH_APP: 'caspian.launchApp',
+  FORCE_STOP_APP: 'caspian.forceStopApp',
+  CLEAR_APP_DATA: 'caspian.clearAppData',
+  UNINSTALL_APP: 'caspian.uninstallApp',
+  SHOW_APP_LOGCAT: 'caspian.showAppLogcat',
+  // AVD enhancements
+  CLONE_AVD: 'caspian.cloneAvd',
+  COLD_BOOT_AVD: 'caspian.coldBootAvd',
+  // Wireless ADB
+  CONNECT_WIFI: 'caspian.connectWifi',
+  DISCONNECT_WIFI: 'caspian.disconnectWifi',
 } as const;
 
 export const VIEWS = {
@@ -34,7 +52,14 @@ export const CONFIG = {
   SDK_PATH: 'androidSdkPath',
   EMULATOR_ARGS: 'emulatorArgs',
   LOGCAT_MAX_LINES: 'logcat.maxLines',
+  LOGCAT_FONT_SIZE: 'logcat.fontSize',
+  LOGCAT_WRAP_LINES: 'logcat.wrapLines',
   SCRCPY_PATH: 'scrcpyPath',
+  DEVICE_TRACKER_INTERVAL: 'deviceTracker.interval',
+  FILE_EXPLORER_SHOW_HIDDEN: 'fileExplorer.showHidden',
+  FILE_EXPLORER_DEFAULT_PATH: 'fileExplorer.defaultPath',
+  AUTO_SELECT_DEVICE: 'autoSelectDevice',
+  COLD_BOOT: 'emulator.coldBoot',
 } as const;
 
 /** Common SDK install locations per platform */

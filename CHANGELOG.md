@@ -2,6 +2,52 @@
 
 All notable changes to Caspian Emulator will be documented in this file.
 
+## [0.4.1] - 2026-03-12
+
+### Fixed
+- **Fix uncaught ADB error on activation** — the extension no longer crashes when the ADB daemon isn't running. The device tracker now handles errors gracefully and logs them to the output channel instead of throwing an uncaught exception
+- **Start ADB server on activation** — the extension now runs `adb start-server` before polling for devices, preventing "daemon not running" errors
+- **Actionable ADB error messages** — daemon failures now suggest checking port 5037 and using "Caspian: Refresh Device List" instead of showing raw stderr
+
+### Changed
+- **Improved marketplace page** — added gallery banner, version/install badges, expanded keywords for discoverability (scrcpy, screen mirror, android sdk, virtual device, mobile), added "Programming Languages" category
+- **Better welcome views** — all three sidebar panels (Virtual Devices, Connected Devices, Device Files) now show helpful empty-state messages with action buttons including Wi-Fi connect and device selector
+- **File Explorer welcome** — added empty-state message with "Select Device" action when no device is selected
+
+## [0.4.0] - 2026-03-12
+
+### Added
+- **Diagnostics Output Channel** — all ADB commands, device events, and errors are logged to the "Caspian Emulator" output panel for easy debugging (`Caspian: Show Output Log` command)
+- **ADB retry logic** — transient ADB failures (device offline, connection reset) are automatically retried with exponential backoff
+- **App management commands** — Launch App, Force Stop, Clear Data, Uninstall, and List Installed Apps with interactive QuickPick menus
+- **Package-level logcat filtering** — show logs from a specific app only (filters by PID, auto-refreshes when app restarts)
+- **Logcat regex search** — filter logs with `/regex/` patterns or toggle the Regex checkbox; plain text search still works
+- **Logcat export** — save captured logs to a `.txt` or `.log` file via the Export button
+- **App Logcat** — right-click a device and choose "Show App Logcat" to open a logcat panel pre-filtered to a specific package
+- **Active device selector** — click the status bar device count to switch the active device; all commands default to the active device (`Ctrl+Shift+D`)
+- **File Explorer: Create Folder** — right-click a directory to create new folders on-device
+- **File Explorer: Rename** — rename files and folders on the device
+- **File Explorer: Open Remote File** — view small text files directly in VS Code without downloading
+- **File Explorer: configurable root path** — set `caspian.fileExplorer.defaultPath` to start browsing from `/sdcard` instead of `/`
+- **File Explorer: hide dotfiles** — toggle hidden files via `caspian.fileExplorer.showHidden` setting
+- **Screen Mirror: swipe gestures** — click-and-drag on the screen to swipe (scroll, fling, drag)
+- **Screen Mirror: scrcpy launch** — if scrcpy is installed, it launches in a separate window with full 30+ FPS touch & keyboard support
+- **Screen Mirror: physical device support** — screen mirroring now works for USB-connected phones, not just emulators
+- **Screen Mirror: FPS counter** — shows real-time frame rate in the bottom bar
+- **Screen Mirror: faster fallback** — screencap interval reduced from 1s to 350ms (~3 FPS)
+- **AVD Clone** — duplicate an existing AVD to create variations for testing
+- **AVD Cold Boot** — launch an emulator without loading snapshots (inline button + setting)
+- **Emulator boot progress** — notification with progress bar while the emulator boots (up to 60s)
+- **Wireless ADB** — connect devices over Wi-Fi via TCP/IP or Android 11+ wireless debugging with pairing code
+- **Keyboard shortcuts** — `Ctrl+Shift+L` (Show Logcat), `Ctrl+Shift+D` (Select Device), `Ctrl+Shift+O` (Show Output)
+- 8 new configurable settings: device polling interval, logcat font size, logcat line wrap, file explorer defaults, cold boot mode, auto-select device
+
+### Changed
+- Status bar now opens the device selector QuickPick instead of just refreshing
+- Logcat toolbar redesigned with Export button and Regex toggle
+- Screen mirror panel renamed from "Emulator Screen" to "Device Screen" (works for all devices)
+- Pre-existing lint warnings in AvdManager fixed (unused variables)
+
 ## [0.3.1] - 2026-03-05
 
 ### Fixed

@@ -2,7 +2,7 @@
   "name": "caspian-emulator",
   "displayName": "Caspian Emulator",
   "description": "Android emulator management for VS Code — no Android Studio required. AVD control, embedded screen, ADB tools, logcat viewer, file explorer, and automatic SDK setup.",
-  "version": "0.3.1",
+  "version": "0.4.1",
   "publisher": "CaspianTools",
   "license": "MIT",
   "engines": {
@@ -10,16 +10,38 @@
   },
   "categories": [
     "Other",
-    "Debuggers"
+    "Debuggers",
+    "Programming Languages"
   ],
   "keywords": [
     "android",
     "emulator",
     "adb",
     "avd",
-    "logcat"
+    "logcat",
+    "scrcpy",
+    "screen mirror",
+    "android sdk",
+    "virtual device",
+    "mobile"
   ],
   "icon": "resources/Icon.png",
+  "galleryBanner": {
+    "color": "#1a1a2e",
+    "theme": "dark"
+  },
+  "badges": [
+    {
+      "url": "https://img.shields.io/visual-studio-marketplace/v/CaspianTools.caspian-emulator",
+      "href": "https://marketplace.visualstudio.com/items?itemName=CaspianTools.caspian-emulator",
+      "description": "VS Code Marketplace Version"
+    },
+    {
+      "url": "https://img.shields.io/visual-studio-marketplace/i/CaspianTools.caspian-emulator",
+      "href": "https://marketplace.visualstudio.com/items?itemName=CaspianTools.caspian-emulator",
+      "description": "Installs"
+    }
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/caspian-explorer/caspian-emulator"
@@ -50,6 +72,45 @@
           "type": "string",
           "default": "",
           "description": "Path to scrcpy binary for screen mirroring. Leave empty for auto-detection."
+        },
+        "caspian.deviceTracker.interval": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Device polling interval in seconds."
+        },
+        "caspian.logcat.fontSize": {
+          "type": "number",
+          "default": 13,
+          "minimum": 8,
+          "maximum": 24,
+          "description": "Font size in the logcat viewer (pixels)."
+        },
+        "caspian.logcat.wrapLines": {
+          "type": "boolean",
+          "default": false,
+          "description": "Wrap long lines in the logcat viewer."
+        },
+        "caspian.fileExplorer.showHidden": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show hidden files (dotfiles) in the device file explorer."
+        },
+        "caspian.fileExplorer.defaultPath": {
+          "type": "string",
+          "default": "/",
+          "description": "Default root path when browsing device files."
+        },
+        "caspian.autoSelectDevice": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically select newly connected devices as the active device."
+        },
+        "caspian.emulator.coldBoot": {
+          "type": "boolean",
+          "default": false,
+          "description": "Always cold boot emulators (ignore snapshots)."
         }
       }
     },
@@ -172,6 +233,96 @@
         "title": "Delete File on Device",
         "category": "Caspian",
         "icon": "$(trash)"
+      },
+      {
+        "command": "caspian.createFolder",
+        "title": "Create Folder on Device",
+        "category": "Caspian",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "caspian.renameFile",
+        "title": "Rename File on Device",
+        "category": "Caspian",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "caspian.openRemoteFile",
+        "title": "Open File from Device",
+        "category": "Caspian",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "caspian.selectDevice",
+        "title": "Select Active Device",
+        "category": "Caspian",
+        "icon": "$(device-mobile)"
+      },
+      {
+        "command": "caspian.showOutput",
+        "title": "Show Output Log",
+        "category": "Caspian",
+        "icon": "$(output)"
+      },
+      {
+        "command": "caspian.listPackages",
+        "title": "List Installed Apps",
+        "category": "Caspian",
+        "icon": "$(list-unordered)"
+      },
+      {
+        "command": "caspian.launchApp",
+        "title": "Launch App",
+        "category": "Caspian",
+        "icon": "$(play)"
+      },
+      {
+        "command": "caspian.forceStopApp",
+        "title": "Force Stop App",
+        "category": "Caspian",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "caspian.clearAppData",
+        "title": "Clear App Data",
+        "category": "Caspian",
+        "icon": "$(discard)"
+      },
+      {
+        "command": "caspian.uninstallApp",
+        "title": "Uninstall App",
+        "category": "Caspian",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "caspian.showAppLogcat",
+        "title": "Show App Logcat",
+        "category": "Caspian",
+        "icon": "$(output)"
+      },
+      {
+        "command": "caspian.cloneAvd",
+        "title": "Clone AVD",
+        "category": "Caspian",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "caspian.coldBootAvd",
+        "title": "Cold Boot Emulator",
+        "category": "Caspian",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "caspian.connectWifi",
+        "title": "Connect Device via Wi-Fi",
+        "category": "Caspian",
+        "icon": "$(radio-tower)"
+      },
+      {
+        "command": "caspian.disconnectWifi",
+        "title": "Disconnect Wi-Fi Device",
+        "category": "Caspian",
+        "icon": "$(debug-disconnect)"
       }
     ],
     "viewsContainers": {
@@ -202,11 +353,15 @@
     "viewsWelcome": [
       {
         "view": "caspian.avdList",
-        "contents": "No Android SDK found.\n[Download & Install Android SDK](command:caspian.downloadSdk)\n[Configure Existing SDK](command:caspian.setupSdk)"
+        "contents": "No Android SDK found.\nCaspian can download and set up the SDK automatically — no Android Studio required.\n[$(cloud-download) Download & Install Android SDK](command:caspian.downloadSdk)\n[$(gear) Configure Existing SDK](command:caspian.setupSdk)"
       },
       {
         "view": "caspian.deviceList",
-        "contents": "No devices connected.\nLaunch an emulator or connect a phone via USB.\n[How to Connect a Phone](command:caspian.connectPhone)"
+        "contents": "No devices connected.\nLaunch a virtual device from the panel above, or connect a phone.\n[$(plug) Connect Phone via USB](command:caspian.connectPhone)\n[$(radio-tower) Connect via Wi-Fi](command:caspian.connectWifi)"
+      },
+      {
+        "view": "caspian.fileExplorer",
+        "contents": "No device selected.\nConnect a device or launch an emulator to browse its files.\n[$(device-mobile) Select Device](command:caspian.selectDevice)"
       }
     ],
     "menus": {
@@ -290,7 +445,7 @@
         },
         {
           "command": "caspian.showEmulatorScreen",
-          "when": "view == caspian.deviceList && viewItem == device.emulator",
+          "when": "view == caspian.deviceList && viewItem =~ /^device\\.(emulator|physical)$/",
           "group": "2_tools"
         },
         {
@@ -299,12 +454,74 @@
           "group": "inline"
         },
         {
+          "command": "caspian.createFolder",
+          "when": "view == caspian.fileExplorer && viewItem == folder",
+          "group": "1_create"
+        },
+        {
+          "command": "caspian.renameFile",
+          "when": "view == caspian.fileExplorer && viewItem =~ /^(file|folder)$/",
+          "group": "1_create"
+        },
+        {
+          "command": "caspian.openRemoteFile",
+          "when": "view == caspian.fileExplorer && viewItem == file",
+          "group": "inline"
+        },
+        {
           "command": "caspian.deleteFile",
           "when": "view == caspian.fileExplorer && viewItem =~ /^(file|folder)$/",
           "group": "2_delete"
+        },
+        {
+          "command": "caspian.launchApp",
+          "when": "view == caspian.deviceList && viewItem =~ /^device\\.(emulator|physical)$/",
+          "group": "0_apps"
+        },
+        {
+          "command": "caspian.forceStopApp",
+          "when": "view == caspian.deviceList && viewItem =~ /^device\\.(emulator|physical)$/",
+          "group": "0_apps"
+        },
+        {
+          "command": "caspian.clearAppData",
+          "when": "view == caspian.deviceList && viewItem =~ /^device\\.(emulator|physical)$/",
+          "group": "0_apps"
+        },
+        {
+          "command": "caspian.uninstallApp",
+          "when": "view == caspian.deviceList && viewItem =~ /^device\\.(emulator|physical)$/",
+          "group": "0_apps"
+        },
+        {
+          "command": "caspian.cloneAvd",
+          "when": "view == caspian.avdList",
+          "group": "1_edit"
+        },
+        {
+          "command": "caspian.coldBootAvd",
+          "when": "view == caspian.avdList && viewItem == avd.stopped",
+          "group": "inline"
         }
       ]
-    }
+    },
+    "keybindings": [
+      {
+        "command": "caspian.showLogcat",
+        "key": "ctrl+shift+l",
+        "mac": "cmd+shift+l"
+      },
+      {
+        "command": "caspian.selectDevice",
+        "key": "ctrl+shift+d",
+        "mac": "cmd+shift+d"
+      },
+      {
+        "command": "caspian.showOutput",
+        "key": "ctrl+shift+o",
+        "mac": "cmd+shift+o"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run build",

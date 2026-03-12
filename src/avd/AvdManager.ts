@@ -3,6 +3,7 @@ import { spawn, ChildProcess } from 'child_process';
 import { SdkInfo, AvdInfo, SystemImage, DeviceProfile, EmulatorProcess } from '../types';
 import * as path from 'path';
 import * as fs from 'fs';
+import { Logger } from '../utils/Logger';
 
 export class AvdManager {
   private sdk: SdkInfo;
@@ -114,8 +115,7 @@ export class AvdManager {
   /** List available system images */
   async listSystemImages(): Promise<SystemImage[]> {
     try {
-      const output = await this.execAvdManager(['list', 'target', '-c']);
-      // Fallback: parse sdkmanager list
+      await this.execAvdManager(['list', 'target', '-c']);
       return this.parseSystemImagesFromSdk();
     } catch {
       return this.parseSystemImagesFromSdk();
@@ -123,7 +123,7 @@ export class AvdManager {
   }
 
   private async parseSystemImagesFromSdk(): Promise<SystemImage[]> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       execFile(this.sdk.sdkmanagerPath, ['--list'], { maxBuffer: 10 * 1024 * 1024, ...(process.platform === 'win32' ? { shell: true } : {}) }, (err, stdout) => {
         if (err) {
           resolve([]);
@@ -276,6 +276,44 @@ export class AvdManager {
   /** Mark AVD as stopped */
   markStopped(avdName: string): void {
     this.runningEmulators.delete(avdName);
+  }
+
+  /** Clone an AVD by copying its directory and creating a new .ini reference */
+  async cloneAvd(sourceName: string, newName: string): Promise<void> {
+    const sourceDir = this.getAvdDirectory(sourceName);
+    const targetDir = this.getAvdDirectory(newName);
+
+    if (!fs.existsSync(sourceDir)) {
+      throw new Error(`Source AVD directory not found: ${sourceDir}`);
+    }
+    if (fs.existsSync(targetDir)) {
+      throw new Error(`Target AVD directory already exists: ${targetDir}`);
+    }
+
+    // Copy AVD directory
+    fs.cpSync(sourceDir, targetDir, { recursive: true });
+
+    // Update config.ini with new name
+    const configPath = path.join(targetDir, 'config.ini');
+    if (fs.existsSync(configPath)) {
+      let config = fs.readFileSync(configPath, 'utf-8');
+      config = config.replace(/avd\.ini\.displayname=.*/, `avd.ini.displayname=${newName}`);
+      fs.writeFileSync(configPath, config);
+    }
+
+    // Create the .ini file that points to the AVD directory
+    const avdHome = process.env.ANDROID_AVD_HOME
+      || path.join(process.env.HOME || process.env.USERPROFILE || '', '.android', 'avd');
+    const iniPath = path.join(avdHome, `${newName}.ini`);
+    const sourceIniPath = path.join(avdHome, `${sourceName}.ini`);
+
+    if (fs.existsSync(sourceIniPath)) {
+      let iniContent = fs.readFileSync(sourceIniPath, 'utf-8');
+      iniContent = iniContent.replace(sourceName, newName);
+      fs.writeFileSync(iniPath, iniContent);
+    }
+
+    Logger.info(`AVD cloned: ${sourceName} → ${newName}`);
   }
 
   /** Get the config.ini path for editing */

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { DeviceFile, DeviceInfo } from '../types';
 import { AdbClient } from '../adb/AdbClient';
+import { CONFIG } from '../constants';
 
 export class FileTreeItem extends vscode.TreeItem {
   constructor(
@@ -56,11 +57,18 @@ export class FileExplorerProvider implements vscode.TreeDataProvider<FileTreeIte
       return [];
     }
 
-    const remotePath = element ? element.file.path : '/';
+    const defaultPath = vscode.workspace.getConfiguration(CONFIG.SECTION)
+      .get<string>(CONFIG.FILE_EXPLORER_DEFAULT_PATH, '/');
+    const remotePath = element ? element.file.path : defaultPath;
     const serial = this.currentDevice.serial;
+    const showHidden = vscode.workspace.getConfiguration(CONFIG.SECTION)
+      .get<boolean>(CONFIG.FILE_EXPLORER_SHOW_HIDDEN, true);
 
     try {
-      const files = await this.adbClient.listFiles(serial, remotePath);
+      let files = await this.adbClient.listFiles(serial, remotePath);
+      if (!showHidden) {
+        files = files.filter(f => !f.name.startsWith('.'));
+      }
       // Sort: directories first, then alphabetically
       files.sort((a, b) => {
         if (a.type === 'directory' && b.type !== 'directory') { return -1; }
