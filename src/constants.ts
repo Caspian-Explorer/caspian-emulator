@@ -39,6 +39,7 @@ export const COMMANDS = {
   // Wireless ADB
   CONNECT_WIFI: 'caspian.connectWifi',
   DISCONNECT_WIFI: 'caspian.disconnectWifi',
+  QR_PAIR: 'caspian.qrPair',
 } as const;
 
 export const VIEWS = {

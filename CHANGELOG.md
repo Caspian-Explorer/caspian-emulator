@@ -2,6 +2,18 @@
 
 All notable changes to Caspian Emulator will be documented in this file.
 
+## [0.5.0] - 2026-03-13
+
+### Added
+- **QR code pairing for wireless debugging** — scan a QR code on your Android 11+ phone to pair instantly, no manual IP/port or pairing code needed. Uses the full ADB wireless pairing protocol (mDNS + TLS + SPAKE2 key exchange)
+- **"Pair with QR Code" option** in the Wi-Fi connect menu — generates a QR code in a webview panel with live status updates as the pairing progresses
+- **Automatic fallback** — if QR pairing isn't available, the manual pairing code flow remains accessible
+
+## [0.4.2] - 2026-03-13
+
+### Fixed
+- **Fix screen mirror for physical devices** — screen capture now works reliably on USB-connected phones. The previous implementation depended on a `base64` binary on the device (not available on many phones) and corrupted binary PNG data through UTF-8 string encoding. Frames are now captured as raw binary via `adb exec-out screencap -p` and converted to base64 in Node.js
+
 ## [0.4.1] - 2026-03-12
 
 ### Fixed

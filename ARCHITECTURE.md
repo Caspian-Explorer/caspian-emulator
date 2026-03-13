@@ -49,7 +49,9 @@ src/
 │   └── SdkDownloader.ts           — Zero-dependency SDK download and installation
 ├── adb/
 │   ├── AdbClient.ts               — ADB command wrapper
-│   └── DeviceTracker.ts           — Real-time device connection monitoring
+│   ├── DeviceTracker.ts           — Real-time device connection monitoring
+│   ├── QrPairingServer.ts         — QR code pairing: mDNS + TLS + SPAKE2 + encrypted peer info
+│   └── Spake2.ts                  — SPAKE2 key exchange (BoringSSL Ed25519 variant)
 ├── avd/
 │   └── AvdManager.ts              — AVD CRUD, emulator launch/stop
 └── views/
@@ -57,7 +59,8 @@ src/
     ├── DeviceTreeProvider.ts      — Sidebar: Connected Devices
     ├── FileExplorerProvider.ts    — Sidebar: Device file browser
     ├── LogcatPanel.ts             — Webview: live logcat viewer
-    └── EmulatorScreenPanel.ts     — Webview: emulator screen mirror
+    ├── EmulatorScreenPanel.ts     — Webview: emulator screen mirror
+    └── QrPairingPanel.ts          — Webview: QR code pairing display
 ```
 
 ## Module Descriptions
@@ -93,6 +96,10 @@ All methods use `child_process.execFile` for one-shot commands and `child_proces
 
 **`src/adb/DeviceTracker.ts`** — Monitors device connections via polling (every 3 seconds). Emits `devicesChanged`, `deviceConnected`, and `deviceDisconnected` events. The extension uses these events to update the device tree view, status bar, and sync running AVD status.
 
+**`src/adb/QrPairingServer.ts`** — Orchestrates the full ADB wireless debugging QR code pairing protocol. Advertises an mDNS service (`_adb-tls-pairing._tcp`), runs a TLS server, performs SPAKE2 key exchange with the phone, and exchanges encrypted peer info (ADB public keys) via AES-128-GCM. Generates self-signed TLS certificates using DER/ASN.1 encoding in pure Node.js.
+
+**`src/adb/Spake2.ts`** — SPAKE2 password-authenticated key exchange implementation compatible with BoringSSL's Ed25519 variant. Generates M/N points from SHA-256 seeds, implements the cofactor-clearing password scalar hack, and produces a 64-byte shared key via SHA-512 transcript hash. Uses `@noble/curves` for elliptic curve operations.
+
 **`src/avd/AvdManager.ts`** — Manages Android Virtual Devices via `avdmanager` and `emulator` CLI tools. Handles:
 - Listing AVDs (via `emulator -list-avds` + config.ini parsing)
 - Creating/deleting AVDs
@@ -121,6 +128,8 @@ All methods use `child_process.execFile` for one-shot commands and `child_proces
 - Tap input forwarding (click position → `adb shell input tap`)
 - Navigation buttons (Back, Home, Recents)
 - scrcpy detection for future higher-quality streaming
+
+**`src/views/QrPairingPanel.ts`** — Webview panel that displays a QR code for wireless debugging pairing. Shows the QR code image, a manual pairing code, and live status updates as the protocol progresses (waiting → TLS connected → exchanging keys → paired). Supports retry and cancel actions.
 
 ### Shared
 

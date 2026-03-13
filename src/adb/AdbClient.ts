@@ -30,6 +30,27 @@ export class AdbClient {
     });
   }
 
+  /** Execute an ADB command and return stdout as a raw Buffer (for binary data like screencap) */
+  execBinary(args: string[], serial?: string): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const fullArgs = serial ? ['-s', serial, ...args] : args;
+      Logger.debug(`adb (binary) ${fullArgs.join(' ')}`);
+      const proc = spawn(this.adbPath, fullArgs);
+      const chunks: Buffer[] = [];
+      proc.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+      let stderr = '';
+      proc.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+      proc.on('error', (err) => reject(err));
+      proc.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`adb (binary) exited ${code}: ${stderr}`));
+          return;
+        }
+        resolve(Buffer.concat(chunks));
+      });
+    });
+  }
+
   /** Execute an ADB command with automatic retry for transient failures */
   async execWithRetry(args: string[], serial?: string, retries: number = 3): Promise<string> {
     let lastError: Error | undefined;

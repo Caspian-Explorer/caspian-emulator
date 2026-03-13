@@ -43,6 +43,7 @@ No Android Studio. No manual path configuration. Just install the extension and 
 ### Physical Phone Support
 - **Guided USB setup** — step-by-step walkthrough: Developer Options → USB Debugging → authorize connection
 - **Wireless ADB** — connect devices over Wi-Fi via TCP/IP or Android 11+ wireless debugging with pairing code
+- **QR code pairing** — scan a QR code to pair instantly (Android 11+), no manual IP/port entry needed
 - Unauthorized phones appear in the sidebar with a one-click "How to Connect" guide
 - Auto-notification when a phone is plugged in without USB debugging enabled
 
@@ -108,7 +109,7 @@ Browse the device filesystem from the sidebar:
 ### Install
 Search **"Caspian Emulator"** in the VS Code Extensions panel, or:
 ```bash
-code --install-extension caspian-emulator-0.4.1.vsix
+code --install-extension caspian-emulator-0.5.0.vsix
 ```
 
 ### First Launch
@@ -154,6 +155,7 @@ Open the Command Palette (`Ctrl+Shift+P`) and type **"Caspian"** to see all comm
 | Caspian: Setup Android SDK | Configure or browse for an existing SDK installation |
 | Caspian: Connect Phone via USB | Step-by-step guide to enable USB debugging |
 | Caspian: Connect Device via Wi-Fi | Connect over TCP/IP or Android 11+ wireless debugging |
+| Caspian: Pair Device with QR Code | Scan a QR code to pair wirelessly (Android 11+) |
 | Caspian: Select Active Device | Choose the active device for all commands |
 | Caspian: Create AVD | Create a virtual device from presets or custom image |
 | Caspian: Clone AVD | Duplicate an existing virtual device |

@@ -11,6 +11,7 @@ import { DeviceTreeProvider, DeviceTreeItem } from './views/DeviceTreeProvider';
 import { FileExplorerProvider, FileTreeItem } from './views/FileExplorerProvider';
 import { LogcatPanel } from './views/LogcatPanel';
 import { EmulatorScreenPanel } from './views/EmulatorScreenPanel';
+import { QrPairingPanel } from './views/QrPairingPanel';
 import { SdkInfo, DeviceInfo } from './types';
 import { Logger } from './utils/Logger';
 
@@ -764,15 +765,25 @@ function registerCommands(context: vscode.ExtensionContext): void {
 
   // ── Wireless ADB ──
 
+  reg(COMMANDS.QR_PAIR, async () => {
+    QrPairingPanel.show(adbClient, deviceTracker);
+  });
+
   reg(COMMANDS.CONNECT_WIFI, async () => {
     const method = await vscode.window.showQuickPick(
       [
-        { label: '$(radio-tower) Wireless Debugging (Android 11+)', description: 'Pair with code, then connect', value: 'pair' },
+        { label: '$(radio-tower) Pair with QR Code (Android 11+)', description: 'Scan a QR code from your phone — fastest method', value: 'qr' },
+        { label: '$(key) Wireless Debugging (Android 11+)', description: 'Pair with code, then connect', value: 'pair' },
         { label: '$(plug) TCP/IP Connect', description: 'Connect to IP:port directly', value: 'tcpip' },
       ],
       { placeHolder: 'How do you want to connect?' }
     );
     if (!method) { return; }
+
+    if (method.value === 'qr') {
+      QrPairingPanel.show(adbClient, deviceTracker);
+      return;
+    }
 
     if (method.value === 'pair') {
       const pairAddress = await vscode.window.showInputBox({

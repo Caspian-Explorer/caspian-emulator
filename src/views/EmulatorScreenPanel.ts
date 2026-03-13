@@ -136,36 +136,20 @@ export class EmulatorScreenPanel {
       if (capturing) { return; } // Skip if previous capture still in progress
       capturing = true;
       try {
-        // Use exec-out for direct binary pipe — faster than shell + base64
-        const b64 = await this.adbClient.exec(
-          ['exec-out', 'screencap', '-p', '|', 'base64'],
+        // Get raw PNG binary from device, convert to base64 in Node.js
+        const pngBuffer = await this.adbClient.execBinary(
+          ['exec-out', 'screencap', '-p'],
           this.serial,
         );
-        if (b64 && b64.length > 100) {
+        if (pngBuffer && pngBuffer.length > 100) {
+          const b64 = pngBuffer.toString('base64');
           this.panel.webview.postMessage({
             type: 'frame',
-            data: `data:image/png;base64,${b64.replace(/\s/g, '')}`,
+            data: `data:image/png;base64,${b64}`,
           });
         }
       } catch {
-        // Try file-based approach as fallback
-        try {
-          const remotePath = '/data/local/tmp/caspian_screen.png';
-          await this.adbClient.exec(['shell', 'screencap', '-p', remotePath], this.serial);
-          const b64Output = await this.adbClient.exec(
-            ['shell', 'base64', remotePath],
-            this.serial,
-          );
-          if (b64Output && b64Output.length > 100) {
-            this.panel.webview.postMessage({
-              type: 'frame',
-              data: `data:image/png;base64,${b64Output.replace(/\s/g, '')}`,
-            });
-          }
-          await this.adbClient.exec(['shell', 'rm', '-f', remotePath], this.serial).catch(() => {});
-        } catch {
-          // Silently skip frame
-        }
+        // Silently skip frame — device may be temporarily unavailable
       }
       capturing = false;
     };
